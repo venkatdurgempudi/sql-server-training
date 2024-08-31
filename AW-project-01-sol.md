@@ -569,3 +569,260 @@ ORDER BY TotalSales DESC;
   - Enhancing marketing efforts in underperforming regions.
   - Strengthening partnerships with key suppliers to improve product offerings.
 
+
+### 8. **Data Quality and Integrity Assessment**
+
+**Objective:** Ensure the data quality and integrity of the Adventure Works database.
+
+**Tasks and Solutions:**
+
+**Task 1:** Identify missing or null values in key tables.
+```sql
+SELECT 'Sales.SalesOrderHeader' AS TableName, COUNT(*) AS NullCount
+FROM Sales.SalesOrderHeader
+WHERE CustomerID IS NULL OR SalesPersonID IS NULL OR ShipToAddressID IS NULL
+UNION ALL
+SELECT 'Person.Person' AS TableName, COUNT(*) AS NullCount
+FROM Person.Person
+WHERE FirstName IS NULL OR LastName IS NULL
+UNION ALL
+SELECT 'Production.Product' AS TableName, COUNT(*) AS NullCount
+FROM Production.Product
+WHERE Name IS NULL OR ProductNumber IS NULL;
+```
+**Explanation:** This query checks key tables for missing or null values in important columns, ensuring that critical data like customer IDs, names, and product details are not missing.
+
+---
+
+**Task 2:** Verify referential integrity by checking for orphaned records.
+```sql
+-- Check for orphaned sales orders with no corresponding customer
+SELECT soh.SalesOrderID, soh.CustomerID
+FROM Sales.SalesOrderHeader soh
+LEFT JOIN Sales.Customer c ON soh.CustomerID = c.CustomerID
+WHERE c.CustomerID IS NULL;
+
+-- Check for orphaned sales order details with no corresponding sales order
+SELECT sod.SalesOrderDetailID, sod.SalesOrderID
+FROM Sales.SalesOrderDetail sod
+LEFT JOIN Sales.SalesOrderHeader soh ON sod.SalesOrderID = soh.SalesOrderID
+WHERE soh.SalesOrderID IS NULL;
+```
+**Explanation:** This query identifies orphaned records in the `SalesOrderHeader` and `SalesOrderDetail` tables by checking for sales orders without corresponding customers or details without corresponding orders.
+
+---
+
+**Task 3:** Assess the uniqueness of key columns (e.g., ProductNumber in the Product table).
+```sql
+SELECT ProductNumber, COUNT(*) AS Count
+FROM Production.Product
+GROUP BY ProductNumber
+HAVING COUNT(*) > 1;
+```
+**Explanation:** This query checks for duplicate `ProductNumber` entries in the `Product` table to ensure that each product has a unique identifier.
+
+---
+
+**Task 4:** Check for data type consistency in important columns.
+```sql
+-- Example: Checking if all ProductID values are integers
+SELECT COUNT(*) AS InconsistentTypes
+FROM Production.Product
+WHERE TRY_CAST(ProductID AS INT) IS NULL;
+
+-- Example: Checking if all TotalDue values are numeric
+SELECT COUNT(*) AS InconsistentTypes
+FROM Sales.SalesOrderHeader
+WHERE TRY_CAST(TotalDue AS DECIMAL(18,2)) IS NULL;
+```
+**Explanation:** These queries check if the `ProductID` and `TotalDue` columns contain consistent data types (integers and decimals, respectively).
+
+---
+
+**Task 5:** Propose strategies for maintaining data quality.
+- **Solution:** To maintain data quality:
+  - **Implement constraints:** Use NOT NULL, UNIQUE, and FOREIGN KEY constraints to enforce data integrity.
+  - **Regular audits:** Schedule regular checks for null values, duplicates, and orphaned records.
+  - **Data validation:** Implement validation rules at the application level to prevent bad data entry.
+  - **Data type enforcement:** Ensure consistent data types across tables and columns by using the appropriate SQL Server data types.
+
+---
+
+### 9. **Advanced Query Optimization**
+
+**Objective:** Optimize SQL queries to improve performance and efficiency.
+
+**Tasks and Solutions:**
+
+**Task 1:** Identify slow-running queries using SQL Server's built-in tools.
+```sql
+-- Example: Using the SQL Server dynamic management views (DMVs) to find slow queries
+SELECT TOP 10
+    qs.sql_handle,
+    qs.total_elapsed_time / qs.execution_count AS AvgElapsedTime,
+    qs.execution_count,
+    SUBSTRING(qt.text, qs.statement_start_offset / 2 + 1, 
+              (CASE WHEN qs.statement_end_offset = -1 
+                    THEN LEN(CONVERT(NVARCHAR(MAX), qt.text)) * 2 
+                    ELSE qs.statement_end_offset 
+               END - qs.statement_start_offset) / 2 + 1) AS QueryText
+FROM sys.dm_exec_query_stats qs
+CROSS APPLY sys.dm_exec_sql_text(qs.sql_handle) qt
+ORDER BY AvgElapsedTime DESC;
+```
+**Explanation:** This query uses SQL Server DMVs to identify slow-running queries based on their average elapsed time.
+
+---
+
+**Task 2:** Optimize a slow-running query by reviewing its execution plan.
+```sql
+-- Example: Analyzing the execution plan of a slow query
+-- Run the following query in SQL Server Management Studio (SSMS)
+SET STATISTICS IO ON;
+SET STATISTICS TIME ON;
+
+SELECT * 
+FROM Sales.SalesOrderHeader soh
+JOIN Sales.SalesOrderDetail sod ON soh.SalesOrderID = sod.SalesOrderID
+WHERE soh.OrderDate BETWEEN '2023-01-01' AND '2023-12-31';
+
+-- Check the execution plan in SSMS to identify optimization opportunities
+```
+**Explanation:** This example enables `SET STATISTICS IO` and `SET STATISTICS TIME` to analyze the I/O and time statistics, helping identify inefficiencies in the query execution plan.
+
+---
+
+**Task 3:** Implement indexing to improve query performance.
+```sql
+-- Example: Creating an index on frequently queried columns
+CREATE INDEX IDX_SalesOrderHeader_OrderDate ON Sales.SalesOrderHeader(OrderDate);
+CREATE INDEX IDX_SalesOrderDetail_ProductID ON Sales.SalesOrderDetail(ProductID);
+```
+**Explanation:** This solution creates indexes on columns that are frequently used in query filters (`OrderDate` and `ProductID`) to improve performance.
+
+---
+
+**Task 4:** Rewrite a suboptimal query to make it more efficient.
+```sql
+-- Suboptimal query
+SELECT p.ProductID, p.Name, (SELECT COUNT(*) FROM Sales.SalesOrderDetail sod WHERE sod.ProductID = p.ProductID) AS OrderCount
+FROM Production.Product p;
+
+-- Optimized query using a join instead of a subquery
+SELECT p.ProductID, p.Name, COUNT(sod.SalesOrderDetailID) AS OrderCount
+FROM Production.Product p
+LEFT JOIN Sales.SalesOrderDetail sod ON p.ProductID = sod.ProductID
+GROUP BY p.ProductID, p.Name;
+```
+**Explanation:** The optimized query replaces a correlated subquery with a `JOIN` and `GROUP BY` clause, which is generally more efficient.
+
+---
+
+**Task 5:** Suggest best practices for query optimization.
+- **Solution:** To optimize queries:
+  - **Use indexes effectively:** Index columns used in WHERE clauses, JOINs, and GROUP BY operations.
+  - **Avoid SELECT *:** Only select the necessary columns to reduce I/O.
+  - **Use appropriate data types:** Smaller data types can reduce memory usage and improve performance.
+  - **Consider query rewriting:** Rewrite subqueries as JOINs where possible, and avoid correlated subqueries if they are inefficient.
+  - **Analyze execution plans:** Regularly review execution plans to identify bottlenecks.
+
+---
+
+### 10. **Database Security and Access Control**
+
+**Objective:** Ensure the security and proper access control of the Adventure Works database.
+
+**Tasks and Solutions:**
+
+**Task 1:** Review and report on the current user roles and permissions.
+```sql
+-- List all database users and their roles
+SELECT dp.name AS UserName, dp.type_desc AS UserType, 
+       rl.name AS RoleName
+FROM sys.database_principals dp
+LEFT JOIN sys.database_role_members drm ON dp.principal_id = drm.member_principal_id
+LEFT JOIN sys.database_principals rl ON drm.role_principal_id = rl.principal_id
+WHERE dp.type NOT IN ('R', 'X')  -- Exclude roles and certificate mappings
+ORDER BY dp.name;
+```
+**Explanation:** This query lists all database users, their roles, and associated permissions.
+
+---
+
+**Task 2:** Implement role-based access control (RBAC) for different user groups.
+```sql
+-- Example: Creating roles and assigning permissions
+-- Create roles for different user groups
+CREATE ROLE SalesRole;
+CREATE ROLE HRRole;
+CREATE ROLE ManagerRole;
+
+-- Grant permissions to roles
+GRANT SELECT ON Sales.SalesOrderHeader TO SalesRole;
+GRANT INSERT, UPDATE ON HumanResources.Employee TO HRRole;
+GRANT SELECT, INSERT, UPDATE, DELETE ON Sales.SalesOrderHeader TO ManagerRole;
+
+-- Add users to roles
+EXEC sp_addrolemember 'SalesRole', 'SalesUser';
+EXEC sp_addrolemember 'HRRole', 'HRUser';
+EXEC sp_addrolemember 'ManagerRole', 'ManagerUser';
+```
+**Explanation:** This example demonstrates creating roles for different user groups, granting appropriate permissions, and adding users to these roles.
+
+---
+
+**Task 3:** Set up auditing to track changes to critical tables.
+```sql
+-- Example: Creating a database audit to track changes to critical tables
+CREATE SERVER AUDIT CriticalTableChangesAudit
+TO FILE (FILEPATH = 'C:\AuditLogs\')
+WITH (QUEUE_DELAY = 1000, ON_FAILURE = CONTINUE);
+
+CREATE DATABASE AUDIT SPECIFICATION CriticalTablesAuditSpec
+FOR SERVER AUDIT CriticalTableChangesAudit
+ADD (UPDATE, DELETE, INSERT ON Sales.SalesOrderHeader BY [public]),
+ADD (UPDATE, DELETE, INSERT ON Production.Product BY [public])
+WITH (STATE = ON);
+```
+**Explanation:** This solution sets up auditing to track changes (INSERT, UPDATE, DELETE) to the `SalesOrderHeader` and `Product` tables, logging them to a file.
+
+---
+
+**Task 4:** Encrypt sensitive data such as customer credit card information.
+```sql
+-- Example: Encrypting sensitive data in the database
+-- Create a database master key
+CREATE MASTER KEY ENCRYPTION
+
+ BY PASSWORD = 'StrongPassword!123';
+
+-- Create a certificate for encryption
+CREATE CERTIFICATE CustomerDataEncryptionCert
+WITH SUBJECT = 'Customer Data Encryption';
+
+-- Create a symmetric key using the certificate
+CREATE SYMMETRIC KEY CustomerDataSymKey
+WITH ALGORITHM = AES_256
+ENCRYPTION BY CERTIFICATE CustomerDataEncryptionCert;
+
+-- Encrypt and store credit card information
+OPEN SYMMETRIC KEY CustomerDataSymKey
+DECRYPTION BY CERTIFICATE CustomerDataEncryptionCert;
+
+UPDATE Sales.CreditCard
+SET CardNumber = ENCRYPTBYKEY(KEY_GUID('CustomerDataSymKey'), CardNumber);
+
+CLOSE SYMMETRIC KEY CustomerDataSymKey;
+```
+**Explanation:** This example encrypts sensitive customer credit card information using a symmetric key and AES-256 encryption.
+
+---
+
+**Task 5:** Suggest best practices for securing the Adventure Works database.
+- **Solution:** To secure the database:
+  - **Implement role-based access control:** Limit user permissions based on roles to enforce the principle of least privilege.
+  - **Use encryption:** Encrypt sensitive data both at rest and in transit.
+  - **Set up auditing:** Monitor and log changes to critical tables and permissions.
+  - **Regularly review permissions:** Periodically audit user roles and permissions to ensure they align with current security policies.
+  - **Keep SQL Server updated:** Apply the latest security patches and updates to protect against vulnerabilities.
+
